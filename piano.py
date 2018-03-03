@@ -3,6 +3,7 @@ import pygame
 import winsound
 import time
 import multiprocessing
+import os.path as osp
 
 BLACK_HEIGHT = 300
 BLACK_WIDTH = 50
@@ -147,7 +148,7 @@ def main():
     for i in range(len(FREQUENCY)):
         if (i == 1 or i == 3 or i == 6 or i == 8 or i == 10 or i == 13 or i == 15 or i == 18 or i == 20 or i == 22):
             left_top_pos = (keys[i - 1].left_top_pos[0] + WHITE_WIDTH - BLACK_WIDTH / 2, keys[i - 1].left_top_pos[1])
-            key = Key(FREQUENCY[i], 300, "black", left_top_pos, "D:\HackTech2018\sounds\%i.wav" % i)
+            key = Key(FREQUENCY[i], 300, "black", left_top_pos, osp.join(osp.join(osp.dirname("__file__"), "sounds"), "%i.wav" % i))
         else:
             if (i == 0):
                 left_top_pos = (0, 0)
@@ -155,7 +156,7 @@ def main():
             else:
                 left_top_pos = (last_white_key[0] + WHITE_WIDTH, last_white_key[1])
                 last_white_key = left_top_pos
-            key = Key(FREQUENCY[i], 300, "white", left_top_pos, "D:\HackTech2018\sounds\%i.wav" % i)
+            key = Key(FREQUENCY[i], 300, "white", left_top_pos, osp.join(osp.join(osp.dirname("__file__"), "sounds"), "%i.wav" % i))
         keys.append(key)
 
     keyboard = Keyboard(keys)
