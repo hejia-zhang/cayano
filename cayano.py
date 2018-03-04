@@ -4,6 +4,9 @@ import winsound
 import time
 import multiprocessing
 import os.path as osp
+import threading
+import math
+
 
 BLACK_HEIGHT = 300
 BLACK_WIDTH = 50
@@ -21,6 +24,23 @@ class Keyboard:
     def __init__(self, keys):
         for key in keys:
             self.keys.append(key)
+
+    def press(self, key):
+        # beep, change color, change color back
+        key.changeColor([128, 128, 128])
+        key.beep()
+
+    def determineKeyPressed(self, xTap, yTap):
+        black_arr = [1,3,6,8,10,13,15,18,20,22]
+        if yTap <= BLACK_HEIGHT:
+            for i in range(len(self.keys)):
+                if xTap >= self.keys[i].left_top_pos[0] and xTap <= self.keys[i].left_top_pos[0] + BLACK_WIDTH and i in black_arr:
+                    return self.keys[i]
+
+        for i in range(len(self.keys)):
+            if xTap >= self.keys[i].left_top_pos[0] and xTap <= self.keys[i].left_top_pos[0] + WHITE_WIDTH and i not in black_arr:
+                return self.keys[i]
+
 class Key:
     frequency = 0
     duration = 0
@@ -28,10 +48,14 @@ class Key:
     kind = "white"
     left_top_pos = [0, 0]
     image = pygame.Surface((WHITE_WIDTH, WHITE_HEIGHT))
+    state_lock = threading.Lock()
+    timer = None
+
     def __init__(self, frequency, duration, kind, left_top_pos, sound_path):
         self.frequency = frequency
         self.duration = duration
         self.kind = kind
+        # self.timer = threading.Timer(2, self.turnColorBack())
         if (self.kind == "white"):
             self.color = (255, 255, 255)
             self.width = WHITE_WIDTH
@@ -51,59 +75,47 @@ class Key:
         self.sound = pygame.mixer.Sound(sound_path)
 
     def beep(self):
-        # winsound.Beep(self.frequency, self.duration)
         self.sound.play()
 
-    def changeColor(self, color = (0, 255, 0)):
-        self.color = color
-        self.image.fill(color)
+    def changeColor(self, color = (128, 128, 128)):
+        if self.state_lock.acquire(False):
+            self.image.fill(color)
+            try:
+                self.timer = threading.Timer(0.3, self.turnColorBack)
+                self.timer.daemon = True
+                self.timer.start()
+            finally:
+                self.state_lock.release()
+
+    def turnColorBack(self):
+        self.state_lock.acquire()
+        self.image.fill(self.color)
+        self.state_lock.release()
 
     def getColor(self):
         return self.color
 
 class SampleListener(Leap.Listener):
-    tap_num = 0
-    fingerNums = ['thumb', 'index', 'middle', 'ring', 'pinky'];
-    handNums = ['left', 'right'];
-    minx = -100
-    maxx = 100
-    minz = -50
-    maxz = 50
-
     def on_connect(self, controller):
         print "Connected"
 
-    def map2screen(self, inx, inz, posout):
-        posout.append((inx - self.minx) / (self.maxx - self.minx ) * 14 * WHITE_WIDTH)
-        posout.append((inz - self.minz) / (self.maxz - self.minz ) * 640)
-
     def on_frame(self, controller):
+        time.sleep(0.05)
         frame = controller.frame()
+        iBox = frame.interaction_box
         # draw finger projection
         fingers = []
-        done = False
-        for i, hand in enumerate(frame.hands):
-            for j, finger in enumerate(hand.fingers):
-                finger_pos = []
-                if (finger.tip_position.x > self.minx and finger.tip_position.x < self.maxx
-                        and finger.tip_position.z > self.minz and finger.tip_position.z < self.maxz):
-                    self.map2screen(finger.tip_position.x, finger.tip_position.z, finger_pos)
+        for finger in frame.fingers:
+            leapPoint = finger.stabilized_tip_position
+            normalizedPoint = iBox.normalize_point(leapPoint, False)
+            finger_pos = [normalizedPoint.x * 14 * WHITE_WIDTH, (1 - normalizedPoint.y) * 720]
 
-                    if (finger.tip_velocity.z < -750):
-                        temp = [finger.tip_position.x, finger.tip_position.z];
-                    else:
-                        temp = [];
+            if finger_pos[0] < 14 * WHITE_WIDTH and finger_pos[0] > 0 and finger_pos[1] < 640 and finger_pos[1] > 0:
+                if ((finger.tip_velocity.y < -300 or math.fabs(finger.tip_velocity.x) > 100 or math.fabs(finger.tip_velocity.x) + math.fabs(finger.tip_velocity.y) > 300)):
+                    key_tap_event = pygame.event.Event(KEYTAP, fingerpos=finger_pos)
+                    pygame.event.post(key_tap_event)
 
-                    if (temp and done == False):  # true if finger is tapping
-                        print("Tap recorded " + self.handNums[i] + " " + self.fingerNums[j])
-                        self.tap_num = self.tap_num + 1
-                        # tappingFingers.append(temp);
-                        self.map2screen(temp[0], temp[1], finger_pos)
-                        key_tap_event = pygame.event.Event(KEYTAP, fingerpos=finger_pos)
-                        pygame.event.post(key_tap_event)
-                        done = True;
-
-                fingers.append(finger_pos);
+            fingers.append(finger_pos)
 
         if len(fingers) > 0:
             draw_finger_event = pygame.event.Event(KEYDRAWFINGERS, fingerspos=fingers)
@@ -112,22 +124,19 @@ class SampleListener(Leap.Listener):
 def main():
     pygame.mixer.init()
     pygame.mixer.pre_init(44100, -16, 24, 1024 * 24)
+    pygame.font.init()
+    title_font = pygame.font.SysFont('Comic Sans MS', 60)
+    titleSurface = title_font.render('Cayano', False, (0, 0, 0))
+    slogan_font = pygame.font.SysFont('Comic Sans MS', 40)
+    sloganSurface = slogan_font.render('Enjoy music!', False, (0, 0, 0))
     pygame.init()
 
-    key_num = len(FREQUENCY)
     white_key_num = 14
-    size = width, height = white_key_num * WHITE_WIDTH, 720
-    key_range = range(0, width, width / key_num)
-    speed = [2, 2]
-    black = 0, 0, 0
+    size = white_key_num * WHITE_WIDTH, 720
 
     screen = pygame.display.set_mode(size)
 
     pygame.display.set_caption("Virtual Piano")
-
-    # keyboard = pygame.image.load("keyboard.jpg")
-    # keyboard = pygame.transform.scale(keyboard, (width, height / 9 * 8))
-    # screen.blit(keyboard, (0, 0))
 
     # Create a sample listener and controller
     listener = SampleListener()
@@ -161,19 +170,11 @@ def main():
 
     keyboard = Keyboard(keys)
 
-    # # Keep this process running until Enter is pressed
-    # print "Press Enter to quit..."
-    # try:
-    #     sys.stdin.readline()
-    # except KeyboardInterrupt:
-    #     pass
-    jobs = []
     while 1:
-        # time.sleep(0.02)
+        time.sleep(0.05)
         screen.fill((255, 255, 255))
-
-        # pygame.draw.circle(screen, (0, 125, 0), (450, 100), 20, 3)
-        # draw every keys
+        screen.blit(titleSurface, (600, 500))
+        screen.blit(sloganSurface, (580, 600))
 
         for key in keyboard.keys:
             if (key.kind == "white"):
@@ -194,23 +195,10 @@ def main():
                 for finger_pos in event.fingerspos:
                     if (len(finger_pos) > 0):
                         pygame.draw.circle(screen, (0, 0, 0), (int(finger_pos[0]), int(finger_pos[1])), 15, 3)
-                        # print("one finger: ", finger_pos)
                 has_drawn_fingers = True
-                # pygame.event.clear(KEYDRAWFINGERS)
 
             if event.type == KEYTAP:
-                print("Beep!")
-                index = -1
-                for i in key_range:
-                    if (i <= event.fingerpos[0]):
-                        index += 1
-                    else:
-                        break
-                print("Index: ", index)
-                print(event.fingerpos)
-                if (index > -1):
-                    keyboard.keys[index].beep()
-                    keyboard.keys[index].changeColor()
+                keyboard.press(keyboard.determineKeyPressed(event.fingerpos[0], event.fingerpos[1]))
 
         pygame.display.flip()
 
