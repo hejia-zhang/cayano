@@ -95,20 +95,8 @@ class Key:
         return self.color
 
 class SampleListener(Leap.Listener):
-    tap_num = 0
-    fingerNums = ['thumb', 'index', 'middle', 'ring', 'pinky'];
-    handNums = ['left', 'right'];
-    minx = -100
-    maxx = 100
-    miny = 82.5
-    maxy = 235
-
     def on_connect(self, controller):
         print "Connected"
-
-    def map2screen(self, inx, inz, posout):
-        posout.append((inx - self.minx) / (self.maxx - self.minx ) * 14 * WHITE_WIDTH)
-        posout.append((inz - self.miny) / (self.maxy - self.miny ) * 640)
 
     def on_frame(self, controller):
         time.sleep(0.05)
@@ -120,12 +108,11 @@ class SampleListener(Leap.Listener):
         for finger in frame.fingers:
             leapPoint = finger.stabilized_tip_position
             normalizedPoint = iBox.normalize_point(leapPoint, False)
-            finger_pos = [normalizedPoint.x * 14 * WHITE_WIDTH, (1 - normalizedPoint.y) * 640]
+            finger_pos = [normalizedPoint.x * 14 * WHITE_WIDTH, (1 - normalizedPoint.y) * 720]
             # self.map2screen(finger.tip_position.x, finger.tip_position.y, finger_pos)
 
             if finger_pos[0] < 14 * WHITE_WIDTH and finger_pos[0] > 0 and finger_pos[1] < 640 and finger_pos[1] > 0:
-                if (finger.tip_velocity.y < -350 and done == False):
-                    self.tap_num = self.tap_num + 1
+                if (finger.tip_velocity.y < -300 and done == False):
                     # tappingFingers.append(temp);
                     # self.map2screen(temp[0], temp[1], finger_pos)
                     key_tap_event = pygame.event.Event(KEYTAP, fingerpos=finger_pos)
