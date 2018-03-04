@@ -127,6 +127,11 @@ class SampleListener(Leap.Listener):
 def main():
     pygame.mixer.init()
     pygame.mixer.pre_init(44100, -16, 24, 1024 * 24)
+    pygame.font.init()
+    title_font = pygame.font.SysFont('Comic Sans MS', 60)
+    titleSurface = title_font.render('Cayano', False, (0, 0, 0))
+    slogan_font = pygame.font.SysFont('Comic Sans MS', 40)
+    sloganSurface = slogan_font.render('Enjoy music!', False, (0, 0, 0))
     pygame.init()
 
     white_key_num = 14
@@ -171,6 +176,8 @@ def main():
     while 1:
         time.sleep(0.05)
         screen.fill((255, 255, 255))
+        screen.blit(titleSurface, (600, 500))
+        screen.blit(sloganSurface, (580, 600))
 
         for key in keyboard.keys:
             if (key.kind == "white"):
