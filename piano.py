@@ -5,6 +5,7 @@ import time
 import multiprocessing
 import os.path as osp
 import threading
+import math
 
 
 BLACK_HEIGHT = 300
@@ -104,20 +105,16 @@ class SampleListener(Leap.Listener):
         iBox = frame.interaction_box
         # draw finger projection
         fingers = []
-        done = False
         for finger in frame.fingers:
             leapPoint = finger.stabilized_tip_position
             normalizedPoint = iBox.normalize_point(leapPoint, False)
             finger_pos = [normalizedPoint.x * 14 * WHITE_WIDTH, (1 - normalizedPoint.y) * 720]
-            # self.map2screen(finger.tip_position.x, finger.tip_position.y, finger_pos)
 
             if finger_pos[0] < 14 * WHITE_WIDTH and finger_pos[0] > 0 and finger_pos[1] < 640 and finger_pos[1] > 0:
-                if (finger.tip_velocity.y < -300 and done == False):
-                    # tappingFingers.append(temp);
-                    # self.map2screen(temp[0], temp[1], finger_pos)
+                if ((finger.tip_velocity.y < -300 or math.fabs(finger.tip_velocity.x) > 100 or math.fabs(finger.tip_velocity.x) + math.fabs(finger.tip_velocity.y) > 300)):
                     key_tap_event = pygame.event.Event(KEYTAP, fingerpos=finger_pos)
                     pygame.event.post(key_tap_event)
-                    done = True
+
             fingers.append(finger_pos)
 
         if len(fingers) > 0:
