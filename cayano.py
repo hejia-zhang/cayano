@@ -51,7 +51,7 @@ class Key:
     state_lock = threading.Lock()
     timer = None
 
-    def __init__(self, frequency, duration, kind, left_top_pos, sound_path):
+    def __init__(self, frequency, duration, kind, left_top_pos, sound_path, channel):
         self.frequency = frequency
         self.duration = duration
         self.kind = kind
@@ -72,10 +72,12 @@ class Key:
             self.image.fill((0, 0, 0))
 
         self.left_top_pos = left_top_pos
+        self.channel = channel
         self.sound = pygame.mixer.Sound(sound_path)
 
     def beep(self):
-        self.sound.play()
+        if not self.channel.get_busy():
+            self.channel.play(self.sound)
 
     def changeColor(self, color = (128, 128, 128)):
         if self.state_lock.acquire(False):
@@ -123,7 +125,8 @@ class SampleListener(Leap.Listener):
 
 def main():
     pygame.mixer.init()
-    pygame.mixer.pre_init(44100, -16, 24, 1024 * 24)
+    pygame.mixer.pre_init(44100, -16, 2, 1024 * 32)
+    pygame.mixer.set_num_channels(24)
     pygame.font.init()
     title_font = pygame.font.SysFont('Comic Sans MS', 60)
     titleSurface = title_font.render('Cayano', False, (0, 0, 0))
@@ -157,7 +160,7 @@ def main():
     for i in range(len(FREQUENCY)):
         if (i == 1 or i == 3 or i == 6 or i == 8 or i == 10 or i == 13 or i == 15 or i == 18 or i == 20 or i == 22):
             left_top_pos = (keys[i - 1].left_top_pos[0] + WHITE_WIDTH - BLACK_WIDTH / 2, keys[i - 1].left_top_pos[1])
-            key = Key(FREQUENCY[i], 300, "black", left_top_pos, osp.join(osp.join(osp.dirname("__file__"), "sounds"), "%i.wav" % i))
+            key = Key(FREQUENCY[i], 300, "black", left_top_pos, osp.join(osp.join(osp.dirname("__file__"), "sounds"), "%i.wav" % i), pygame.mixer.Channel(i))
         else:
             if (i == 0):
                 left_top_pos = (0, 0)
@@ -165,7 +168,7 @@ def main():
             else:
                 left_top_pos = (last_white_key[0] + WHITE_WIDTH, last_white_key[1])
                 last_white_key = left_top_pos
-            key = Key(FREQUENCY[i], 300, "white", left_top_pos, osp.join(osp.join(osp.dirname("__file__"), "sounds"), "%i.wav" % i))
+            key = Key(FREQUENCY[i], 300, "white", left_top_pos, osp.join(osp.join(osp.dirname("__file__"), "sounds"), "%i.wav" % i), pygame.mixer.Channel(i))
         keys.append(key)
 
     keyboard = Keyboard(keys)
